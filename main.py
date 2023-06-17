@@ -4,6 +4,9 @@ from starlette.exceptions import HTTPException as MethodNotAllowedException
 from starlette.responses import JSONResponse
 from pydantic import BaseModel
 
+from transformers import AutoTokenizer, AutoModelForSequenceClassification
+
+
 # Connect FastAPI
 app = FastAPI()
 
@@ -31,6 +34,14 @@ async def generic_exception_handler(request, exc):
         content={"message": "Internal server error"}
     )
 
+# Error handling for unprocessable entity error
+@app.exception_handler(HTTPException)
+async def unprocessable_entity_exception_handler(request, exc):
+    return JSONResponse(
+        status_code=exc.status_code,
+        content={"message": exc.detail}
+    )
+
 # Request body model
 class AnalysisRequest(BaseModel):
     text: str
@@ -38,6 +49,11 @@ class AnalysisRequest(BaseModel):
 # Response model
 class AnalysisResponse(BaseModel):
     sentiment: str
+
+
+tokenizer = AutoTokenizer.from_pretrained("StatsGary/setfit-ft-sentinent-eval")
+model = AutoModelForSequenceClassification.from_pretrained("StatsGary/setfit-ft-sentinent-eval")
+
 
 # Endpoint for sentiment analysis
 @app.post("/analyze")
@@ -47,12 +63,21 @@ def analyze_sentiment(request: AnalysisRequest):
 
     # If Not Text raise Error
     if not text:
-        raise HTTPException(status_code=400, detail="Invalid request: Text is missing")
+        raise HTTPException(status_code=422, detail="Invalid request: Text is missing")
+
+    # Perform sentiment analysis on the text
+    sentiment = perform_sentiment_analysis(text)
+    return AnalysisResponse(sentiment=sentiment)
 
 
-    # Prepare the response
-    response = AnalysisResponse(sentiment="positive")
-    return response
+def perform_sentiment_analysis(text):
+    inputs = tokenizer(text, padding=True, truncation=True, return_tensors="pt")
+    outputs = model(**inputs)
+    predictions = outputs.logits.argmax(dim=1)
+    sentiment = ["positive", "negative", "neutral"][predictions.item()]
+    print(sentiment)
+    return sentiment
+
 
 # Run the application
 if __name__ == "__main__":

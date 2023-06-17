@@ -5,7 +5,7 @@
 2. Install packages:
     * pip install -r requirements.txt
 
-3. Run the server:
+3. Run the web server:
     * uvicorn main:app --reload
 
 4. Open your Browser and put this link:
