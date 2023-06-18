@@ -3,7 +3,6 @@ from starlette.exceptions import HTTPException as StarletteHTTPException
 from starlette.exceptions import HTTPException as MethodNotAllowedException
 from starlette.responses import JSONResponse
 from pydantic import BaseModel
-
 from transformers import AutoTokenizer, AutoModelForSequenceClassification
 
 
@@ -34,14 +33,6 @@ async def generic_exception_handler(request, exc):
         content={"message": "Internal server error"}
     )
 
-# Error handling for unprocessable entity error
-@app.exception_handler(HTTPException)
-async def unprocessable_entity_exception_handler(request, exc):
-    return JSONResponse(
-        status_code=exc.status_code,
-        content={"message": exc.detail}
-    )
-
 # Request body model
 class AnalysisRequest(BaseModel):
     text: str
@@ -51,6 +42,7 @@ class AnalysisResponse(BaseModel):
     sentiment: str
 
 
+# Load the pre-trained tokenizer and model
 tokenizer = AutoTokenizer.from_pretrained("StatsGary/setfit-ft-sentinent-eval")
 model = AutoModelForSequenceClassification.from_pretrained("StatsGary/setfit-ft-sentinent-eval")
 
@@ -70,13 +62,15 @@ def analyze_sentiment(request: AnalysisRequest):
     return AnalysisResponse(sentiment=sentiment)
 
 
+# Perform sentiment analysis on the text
 def perform_sentiment_analysis(text):
     inputs = tokenizer(text, padding=True, truncation=True, return_tensors="pt")
     outputs = model(**inputs)
     predictions = outputs.logits.argmax(dim=1)
-    sentiment = ["positive", "negative", "neutral"][predictions.item()]
-    print(sentiment)
+    sentiment_labels = ["positive", "negative", "neutral"]
+    sentiment = sentiment_labels[predictions.item()]
     return sentiment
+
 
 
 # Run the application
