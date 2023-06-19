@@ -1,51 +1,14 @@
 from fastapi import FastAPI, HTTPException
-from starlette.exceptions import HTTPException as StarletteHTTPException
-from starlette.exceptions import HTTPException as MethodNotAllowedException
-from starlette.responses import JSONResponse
-from pydantic import BaseModel
-from transformers import AutoTokenizer, AutoModelForSequenceClassification
-
+from analysis.models import AnalysisRequest, AnalysisResponse
+from analysis.services import perform_sentiment_analysis
+from handlers.exceptions import http_exception_handler, generic_exception_handler
 
 # Connect FastAPI
 app = FastAPI()
 
-# Exception handler for StarletteHTTPException
-@app.exception_handler(StarletteHTTPException)
-async def http_exception_handler(request, exc):
-    return JSONResponse(
-        status_code=exc.status_code,
-        content={"message": "Go there: http://127.0.0.1:8000/docs#/"}
-    )
-
-# Exception handler for MethodNotAllowedException
-@app.exception_handler(MethodNotAllowedException)
-async def method_not_allowed_exception_handler(request, exc):
-    return JSONResponse(
-        status_code=exc.status_code,
-        content={"message": "Method Not Allowed"}
-    )
-
-# Exception handler for generic Exception
-@app.exception_handler(Exception)
-async def generic_exception_handler(request, exc):
-    return JSONResponse(
-        status_code=500,
-        content={"message": "Internal server error"}
-    )
-
-# Request body model
-class AnalysisRequest(BaseModel):
-    text: str
-
-# Response model
-class AnalysisResponse(BaseModel):
-    sentiment: str
-
-
-# Load the pre-trained tokenizer and model
-tokenizer = AutoTokenizer.from_pretrained("StatsGary/setfit-ft-sentinent-eval")
-model = AutoModelForSequenceClassification.from_pretrained("StatsGary/setfit-ft-sentinent-eval")
-
+# Import and pass the `app` object to exception handlers
+http_exception_handler(app)
+generic_exception_handler(app)
 
 # Endpoint for sentiment analysis
 @app.post("/analyze")
@@ -53,23 +16,13 @@ def analyze_sentiment(request: AnalysisRequest):
     # Input text
     text = request.text
 
-    # If Not Text raise Error
+    # If not text, raise an error
     if not text:
         raise HTTPException(status_code=422, detail="Invalid request: Text is missing")
 
     # Perform sentiment analysis on the text
     sentiment = perform_sentiment_analysis(text)
     return AnalysisResponse(sentiment=sentiment)
-
-
-# Perform sentiment analysis on the text
-def perform_sentiment_analysis(text):
-    inputs = tokenizer(text, padding=True, truncation=True, return_tensors="pt")
-    outputs = model(**inputs)
-    predictions = outputs.logits.argmax(dim=1)
-    sentiment_labels = ["positive", "negative", "neutral"]
-    sentiment = sentiment_labels[predictions.item()]
-    return sentiment
 
 
 
